@@ -14,7 +14,8 @@ const SLUG_TO_PAGE = {
   'contact': '1ccd2b68726681898e7bf551ca471af1',
   'tags': '1ccd2b68726681c6b0b5ea3439f9e182',
   'category': '1ccd2b687266812da4f4f544abe8d2e9',
-  'managers-path': '1ccd2b6872668040a17af9c34bfa4452'
+  'managers-path': '1ccd2b6872668040a17af9c34bfa4452',
+  'genai-future': '1ccd2b687266811db0d5d916d64501b8'
 };
 
 /* Step 3: enter your page title and description for SEO purposes */
@@ -96,8 +97,14 @@ async function fetchAndApply(request) {
   // 路由 rewrite: /經理人之道-技術領袖航向成長與改變的參考指南/ -> /managers-path
   const managers_path = '/%E7%B6%93%E7%90%86%E4%BA%BA%E4%B9%8B%E9%81%93-%E6%8A%80%E8%A1%93%E9%A0%98%E8%A2%96%E8%88%AA%E5%90%91%E6%88%90%E9%95%B7%E8%88%87%E6%94%B9%E8%AE%8A%E7%9A%84%E5%8F%83%E8%80%83%E6%8C%87%E5%8D%97/';
   if (url.pathname === managers_path) {
-    url.pathname = '/managers-path'
-    return Response.redirect(url.toString(), 301)
+    url.pathname = '/managers-path';
+    return Response.redirect(url.toString(), 301);
+  }
+  // 路由 rewrite: /【生成式ai驅動未來變革：開源工具與技術架構的雙/ -> /genai-future
+  const genai_future = '/%E3%80%90%E7%94%9F%E6%88%90%E5%BC%8Fai%E9%A9%85%E5%8B%95%E6%9C%AA%E4%BE%86%E8%AE%8A%E9%9D%A9%EF%BC%9A%E9%96%8B%E6%BA%90%E5%B7%A5%E5%85%B7%E8%88%87%E6%8A%80%E8%A1%93%E6%9E%B6%E6%A7%8B%E7%9A%84%E9%9B%99/';
+  if (url.pathname === genai_future) {
+    url.pathname = '/genai-future';
+    return Response.redirect(url.toString(), 301);
   }
 
   url.hostname = 'www.notion.so';
