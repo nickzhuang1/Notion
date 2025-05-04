@@ -11,10 +11,12 @@ const MY_DOMAIN = 'nickzhuang.com';
 const SLUG_TO_PAGE = {
   '': '1ccd2b68726680d1887ae04ad476f98b',
   'about': '1ccd2b687266810f9dd2ff9758ed2c8e',
+  '關於我': '1ccd2b687266810f9dd2ff9758ed2c8e',
   'contact': '1ccd2b68726681898e7bf551ca471af1',
   'tags': '1ccd2b68726681c6b0b5ea3439f9e182',
   'category': '1ccd2b687266812da4f4f544abe8d2e9',
   'managers-path': '1ccd2b6872668040a17af9c34bfa4452',
+  '經理人之道-技術領袖航向成長與改變的參考指南': '1ccd2b6872668040a17af9c34bfa4452',
   'genai-future': '1ccd2b687266811db0d5d916d64501b8'
 };
 
@@ -49,7 +51,7 @@ function generateSitemap() {
   let sitemap = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
   slugs.forEach((slug) => {
     sitemap += '<url>';
-    sitemap += `<url><loc>https://${MY_DOMAIN}/${encodeURIComponent(slug)}</loc></url>`;
+    sitemap += `<loc>https://${MY_DOMAIN}/${encodeURIComponent(slug)}</loc>`;
     sitemap += '<lastmod>' + now + '</lastmod>';
     sitemap += '<changefreq>weekly</changefreq>';
     sitemap += '<priority>' + (slug === '' ? '1.0' : '0.8') + '</priority>';
@@ -88,24 +90,20 @@ async function fetchAndApply(request) {
     return handleOptions(request);
   }
   let url = new URL(request.url);
-  // 路由 rewrite: /關於我/ -> /about
-  const about_me = '/%E9%97%9C%E6%96%BC%E6%88%91/';
-  if (url.pathname === about_me) {
+  const decodedPath = decodeURIComponent(url.pathname);
+  if (decodedPath === '/關於我') {
     url.pathname = '/about';
     return Response.redirect(url.toString(), 301);
   }
-  // 路由 rewrite: /經理人之道-技術領袖航向成長與改變的參考指南/ -> /managers-path
-  const managers_path = '/%E7%B6%93%E7%90%86%E4%BA%BA%E4%B9%8B%E9%81%93-%E6%8A%80%E8%A1%93%E9%A0%98%E8%A2%96%E8%88%AA%E5%90%91%E6%88%90%E9%95%B7%E8%88%87%E6%94%B9%E8%AE%8A%E7%9A%84%E5%8F%83%E8%80%83%E6%8C%87%E5%8D%97/';
-  if (url.pathname === managers_path) {
+  if (decodedPath === '/經理人之道-技術領袖航向成長與改變的參考指南') {
     url.pathname = '/managers-path';
     return Response.redirect(url.toString(), 301);
   }
-  // 路由 rewrite: /【生成式ai驅動未來變革：開源工具與技術架構的雙/ -> /genai-future
-  const genai_future = '/%E3%80%90%E7%94%9F%E6%88%90%E5%BC%8Fai%E9%A9%85%E5%8B%95%E6%9C%AA%E4%BE%86%E8%AE%8A%E9%9D%A9%EF%BC%9A%E9%96%8B%E6%BA%90%E5%B7%A5%E5%85%B7%E8%88%87%E6%8A%80%E8%A1%93%E6%9E%B6%E6%A7%8B%E7%9A%84%E9%9B%99/';
-  if (url.pathname === genai_future) {
+  if (decodedPath === '/【生成式ai驅動未來變革：開源工具與技術架構的雙') {
     url.pathname = '/genai-future';
     return Response.redirect(url.toString(), 301);
   }
+
 
   url.hostname = 'www.notion.so';
   
@@ -146,8 +144,10 @@ async function fetchAndApply(request) {
     );
     response.headers.set("Content-Type", "application/x-javascript");
     return response;
-  } else if (slugs.indexOf(url.pathname.slice(1)) > -1) {
-    const pageId = SLUG_TO_PAGE[url.pathname.slice(1)];
+  } 
+  const decodedSlug = decodeURIComponent(url.pathname.slice(1));
+  if (SLUG_TO_PAGE.hasOwnProperty(decodedSlug)) {
+    const pageId = SLUG_TO_PAGE[decodedSlug];
     return Response.redirect('https://' + MY_DOMAIN + '/' + pageId, 301);
   } else {
     response = await fetch(url.toString(), {
@@ -257,9 +257,15 @@ class BodyRewriter {
     function getSlug() {
       return location.pathname.slice(1);
     }
+    function isChineseSlug(slug) {
+      return /[\u4e00-\u9fff]/.test(slug);
+    }
     function updateSlug() {
-      const slug = PAGE_TO_SLUG[getPage()];
+      let slug = PAGE_TO_SLUG[getPage()];
       if (slug != null) {
+        if (isChineseSlug(slug) && !slug.endsWith('/')) {
+          slug += '/';
+        }
         history.replaceState(history.state, '', '/' + slug);
       }
     }
@@ -334,7 +340,11 @@ class BodyRewriter {
       const dest = new URL(location.protocol + location.host + arguments[2]);
       const id = dest.pathname.slice(-32);
       if (pages.includes(id)) {
-        arguments[2] = '/' + PAGE_TO_SLUG[id];
+        let slug = PAGE_TO_SLUG[id];
+        if (isChineseSlug(slug) && !slug.endsWith('/')) {
+          slug += '/';
+        }
+        arguments[2] = '/' + slug;
       }
       return pushState.apply(window.history, arguments);
     };
