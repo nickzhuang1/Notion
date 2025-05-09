@@ -17,7 +17,8 @@ const SLUG_TO_PAGE = {
   'category': '1ccd2b687266812da4f4f544abe8d2e9',
   'managers-path': '1ccd2b6872668040a17af9c34bfa4452',
   '經理人之道-技術領袖航向成長與改變的參考指南': '1ccd2b6872668040a17af9c34bfa4452',
-  'genai-future': '1ccd2b687266811db0d5d916d64501b8'
+  'genai-future': '1ccd2b687266811db0d5d916d64501b8',
+  '【生成式ai驅動未來變革：開源工具與技術架構的雙': '1ccd2b687266811db0d5d916d64501b8'
 };
 
 /* Step 3: enter your page title and description for SEO purposes */
@@ -46,19 +47,43 @@ addEventListener('fetch', event => {
   event.respondWith(fetchAndApply(event.request));
 });
 
-function generateSitemap() {
-  const now = new Date().toISOString();
-  let sitemap = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-  slugs.forEach((slug) => {
-    sitemap += '<url>';
-    sitemap += `<loc>https://${MY_DOMAIN}/${encodeURIComponent(slug)}</loc>`;
-    sitemap += '<lastmod>' + now + '</lastmod>';
-    sitemap += '<changefreq>weekly</changefreq>';
-    sitemap += '<priority>' + (slug === '' ? '1.0' : '0.8') + '</priority>';
-    sitemap += '</url>';
-  });
-  sitemap += '</urlset>';
-  return sitemap;
+// Slug normalize 工具，確保一致性（處理中文加 /）
+function normalizeSlug(slug) {
+  try {
+    const decoded = decodeURIComponent(slug);
+    if (/[\u4e00-\u9fa5]/.test(decoded) && !decoded.endsWith('/')) {
+      return decoded + '/';
+    }
+    return decoded;
+  } catch {
+    return slug;
+  }
+}
+
+// sitemap 生成功能：補上所有 slug
+async function generateSitemap() {
+  const baseUrl = 'https://' + MY_DOMAIN
+
+  const slugSet = new Set();
+
+  // 加入 slug-to-page slug
+  for (const slug of Object.keys(SLUG_TO_PAGE)) {
+    slugSet.add(normalizeSlug(slug))
+  }
+
+  // 加入 redirect 中的 slug
+  for (const [from, _] of Object.entries(redirects)) {
+    slugSet.add(normalizeSlug(from))
+  }
+
+  const urls = Array.from(slugSet).map(
+    (slug) => `<url><loc>${baseUrl}/${slug}</loc></url>`
+  )
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    ${urls.join('\n')}
+  </urlset>`
 }
 
 const corsHeaders = {
@@ -85,25 +110,32 @@ function handleOptions(request) {
   }
 }
 
+const redirects = {
+  '/關於我': '/about',
+  '/關於我/': '/about',
+  '/經理人之道-技術領袖航向成長與改變的參考指南': '/managers-path',
+  '/經理人之道-技術領袖航向成長與改變的參考指南/': '/managers-path',
+  '/【生成式ai驅動未來變革：開源工具與技術架構的雙': '/genai-future',
+  '/【生成式ai驅動未來變革：開源工具與技術架構的雙/': '/genai-future'
+};
+
 async function fetchAndApply(request) {
   if (request.method === 'OPTIONS') {
     return handleOptions(request);
   }
   let url = new URL(request.url);
   const decodedPath = decodeURIComponent(url.pathname);
-  if (decodedPath === '/關於我') {
-    url.pathname = '/about';
-    return Response.redirect(url.toString(), 301);
-  }
-  if (decodedPath === '/經理人之道-技術領袖航向成長與改變的參考指南') {
-    url.pathname = '/managers-path';
-    return Response.redirect(url.toString(), 301);
-  }
-  if (decodedPath === '/【生成式ai驅動未來變革：開源工具與技術架構的雙') {
-    url.pathname = '/genai-future';
-    return Response.redirect(url.toString(), 301);
-  }
 
+  let slug = url.pathname;
+
+  // 檢查是否存在於 redirects
+  const normalizedSlug = normalizeSlug(slug);
+  if (redirects[slug]) {
+    return Response.redirect(`https://${MY_DOMAIN}${redirects[slug]}`, 301);
+  }
+  if (redirects[normalizedSlug]) {
+    return Response.redirect(`https://${MY_DOMAIN}${redirects[normalizedSlug]}`, 301);
+  }
 
   url.hostname = 'www.notion.so';
   
@@ -111,7 +143,7 @@ async function fetchAndApply(request) {
     return new Response('Sitemap: https://' + MY_DOMAIN + '/sitemap.xml');
   }
   if (url.pathname === '/sitemap.xml') {
-    let response = new Response(generateSitemap());
+    let response = new Response(await generateSitemap());
     response.headers.set('content-type', 'application/xml');
     return response;
   }
@@ -165,7 +197,7 @@ async function fetchAndApply(request) {
 
 class MetaRewriter {
   element(element) {
-    if (PAGE_TITLE !== '') {
+    if (PAGE_TITLE) {
       if (element.getAttribute('property') === 'og:title'
         || element.getAttribute('name') === 'twitter:title') {
         element.setAttribute('content', PAGE_TITLE);
@@ -174,7 +206,7 @@ class MetaRewriter {
         element.setInnerContent(PAGE_TITLE);
       }
     }
-    if (PAGE_DESCRIPTION !== '') {
+    if (PAGE_DESCRIPTION) {
       if (element.getAttribute('name') === 'description'
         || element.getAttribute('property') === 'og:description'
         || element.getAttribute('name') === 'twitter:description') {
@@ -193,7 +225,7 @@ class MetaRewriter {
 
 class HeadRewriter {
   element(element) {
-    if (GOOGLE_FONT !== '') {
+    if (GOOGLE_FONT) {
       element.append(`<link href="https://fonts.googleapis.com/css?family=${GOOGLE_FONT.replace(' ', '+')}:Regular,Bold,Italic&display=swap" rel="stylesheet">
       <style>* { font-family: "${GOOGLE_FONT}" !important; }</style>`, {
         html: true
@@ -258,8 +290,9 @@ class BodyRewriter {
       return location.pathname.slice(1);
     }
     function isChineseSlug(slug) {
-      return /[\u4e00-\u9fff]/.test(slug);
+      return /[\p{Script=Han}，。！？：「」、（）【】《》－]/u.test(slug);
     }
+
     function updateSlug() {
       let slug = PAGE_TO_SLUG[getPage()];
       if (slug != null) {
