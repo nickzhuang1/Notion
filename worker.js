@@ -18,7 +18,10 @@ const SLUG_TO_PAGE = {
   'managers-path': '1ccd2b6872668040a17af9c34bfa4452',
   '經理人之道-技術領袖航向成長與改變的參考指南': '1ccd2b6872668040a17af9c34bfa4452',
   'genai-future': '1ccd2b687266811db0d5d916d64501b8',
-  '【生成式ai驅動未來變革：開源工具與技術架構的雙': '1ccd2b687266811db0d5d916d64501b8'
+  '【生成式ai驅動未來變革：開源工具與技術架構的雙': '1ccd2b687266811db0d5d916d64501b8',
+  'career-review': '1ccd2b68726681b3aec9ff112d6234db',
+  'category-ai': '1ccd2b68726681e5b15ceee94737bc00',
+  'category-book': '1ccd2b68726680b9938cf2c0a6384cb4'
 };
 
 /* Step 3: enter your page title and description for SEO purposes */
@@ -62,29 +65,35 @@ function normalizeSlug(slug) {
 
 // sitemap 生成功能：補上所有 slug
 async function generateSitemap() {
-  const baseUrl = 'https://' + MY_DOMAIN
+  const baseUrl = 'https://' + MY_DOMAIN;
 
   const slugSet = new Set();
 
   // 加入 slug-to-page slug
   for (const slug of Object.keys(SLUG_TO_PAGE)) {
-    slugSet.add(normalizeSlug(slug))
+    slugSet.add(normalizeSlug(slug));
   }
 
   // 加入 redirect 中的 slug
   for (const [from, _] of Object.entries(redirects)) {
-    slugSet.add(normalizeSlug(from))
+    slugSet.add(normalizeSlug(from));
   }
 
-  const urls = Array.from(slugSet).map(
-    (slug) => `<url><loc>${baseUrl}/${slug}</loc></url>`
-  )
+  const urls = Array.from(slugSet).map((slug) => {
+    const loc = `${baseUrl}/${slug}`;
+
+    return `<url>
+  <loc>${loc}</loc>
+  <lastmod>${new Date().toISOString()}</lastmod>
+</url>`;
+  });
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-    ${urls.join('\n')}
-  </urlset>`
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join('\n')}
+</urlset>`;
 }
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -113,10 +122,14 @@ function handleOptions(request) {
 const redirects = {
   '/關於我': '/about',
   '/關於我/': '/about',
+  '/author/andy345694/': '/about',
   '/經理人之道-技術領袖航向成長與改變的參考指南': '/managers-path',
   '/經理人之道-技術領袖航向成長與改變的參考指南/': '/managers-path',
   '/【生成式ai驅動未來變革：開源工具與技術架構的雙': '/genai-future',
-  '/【生成式ai驅動未來變革：開源工具與技術架構的雙/': '/genai-future'
+  '/【生成式ai驅動未來變革：開源工具與技術架構的雙/': '/genai-future',
+  '/category/career/review/': '/career-review',
+  '/category/ai/': '/category-ai',
+  '/category/life-exploration/book/': '/category-book'
 };
 
 async function fetchAndApply(request) {
