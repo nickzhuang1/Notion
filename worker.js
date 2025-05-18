@@ -49,10 +49,23 @@ addEventListener('fetch', event => {
 });
 
 function normalizeSlug(slug) {
-  return slug
-    .trim()
-    .replace(/^\/+/, '') // 移除前面的斜線
-    .replace(/\/+$/, '') // 移除後面的斜線
+  if (!slug) return '';
+  // 移除 query string 和 hash
+  slug = slug.split('?')[0].split('#')[0];
+
+  // decode URI component
+  slug = decodeURIComponent(slug);
+
+  // 移除前後多餘斜線
+  slug = slug.trim().replace(/^\/+|\/+$/g, '');
+
+  // 中文開頭或全為中文 → 強制加尾斜線
+  const isChinese = /[\u4e00-\u9fa5]/.test(slug);
+  if (isChinese && !slug.endsWith('/')) {
+    slug += '/';
+  }
+
+  return slug;
 }
 
 const redirects = {
@@ -61,47 +74,45 @@ const redirects = {
   '/經理人之道-技術領袖航向成長與改變的參考指南/': '/managers-path',
   '/【生成式ai驅動未來變革：開源工具與技術架構的雙/': '/genai-future',
   '/category/career/review/': '/career-review',
+  '/category/career/review': '/career-review',
   '/category/career/review/feed/': '/career-review',
+  '/category/career/review/feed': '/career-review',
   '/category/ai/': '/category-ai',
+  '/category/ai': '/category-ai',
   '/category/life-exploration/book/': '/category-book',
+  '/category/life-exploration/book': '/category-book',
   '/圖像生成式ai的生存指南-以stable-diffusion為例/': '/image-genai-guide'
 };
 
-// sitemap 生成功能：補上所有 slug
-function generateSitemap() {
+async function generateSitemap() {
   const baseUrl = 'https://' + MY_DOMAIN;
-
   const slugSet = new Set();
 
-  // 加入 slug-to-page slug
+  // 1. SLUG_TO_PAGE 的 key 都視為有效網址
   for (const slug of Object.keys(SLUG_TO_PAGE)) {
     slugSet.add(normalizeSlug(slug));
   }
 
-  // 加入 redirect 中的 slug
-  for (const [from, _] of Object.entries(redirects)) {
-    slugSet.add(normalizeSlug(from))
+  // 2. redirects 的 from slug 也納入 sitemap（代表舊網址還要 index）
+  for (const [from] of Object.entries(redirects)) {
+    slugSet.add(normalizeSlug(from));
   }
 
+  const now = new Date().toISOString();
+
   const urls = Array.from(slugSet).map((slug) => {
-    let normalized = normalizeSlug(slug)
-
-    // 根頁面
-    if (normalized === '') {
-      return `<url><loc>${baseUrl}</loc></url>`
-    }
-
-    // 中文 slug：結尾加 `/`
-    const isChinese = /[\u4e00-\u9fff]/.test(normalized)
-    const urlPath = isChinese ? `/${normalized}/` : `/${normalized}`
-
-    return `<url><loc>${baseUrl}${urlPath}</loc></url>`
-  })
+    const normalizedPath = slug.startsWith('/') ? slug.slice(1) : slug;
+    return `
+  <url>
+    <loc>${baseUrl}/${normalizedPath}</loc>
+    <lastmod>${now}</lastmod>
+  </url>`;
+  });
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.join('\n')}
-</urlset>`
+  ${urls.join('\n')}
+</urlset>`;
 }
 
 const corsHeaders = {
@@ -146,7 +157,7 @@ async function fetchAndApply(request) {
     return new Response('Sitemap: https://' + MY_DOMAIN + '/sitemap.xml');
   }
   if (url.pathname === '/sitemap.xml') {
-    let response = new Response(generateSitemap());
+    let response = new Response(await generateSitemap());
     response.headers.set('content-type', 'application/xml');
     return response;
   }
