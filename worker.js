@@ -11,17 +11,15 @@ const MY_DOMAIN = 'nickzhuang.com';
 const SLUG_TO_PAGE = {
   '': '1ccd2b68726680d1887ae04ad476f98b',
   'about': '1ccd2b687266810f9dd2ff9758ed2c8e',
-  '關於我': '1ccd2b687266810f9dd2ff9758ed2c8e',
   'contact': '1ccd2b68726681898e7bf551ca471af1',
   'tags': '1ccd2b68726681c6b0b5ea3439f9e182',
   'category': '1ccd2b687266812da4f4f544abe8d2e9',
   'managers-path': '1ccd2b6872668040a17af9c34bfa4452',
-  '經理人之道-技術領袖航向成長與改變的參考指南': '1ccd2b6872668040a17af9c34bfa4452',
   'genai-future': '1ccd2b687266811db0d5d916d64501b8',
-  '【生成式ai驅動未來變革：開源工具與技術架構的雙': '1ccd2b687266811db0d5d916d64501b8',
   'career-review': '1ccd2b68726681b3aec9ff112d6234db',
   'category-ai': '1ccd2b68726681e5b15ceee94737bc00',
-  'category-book': '1ccd2b68726680b9938cf2c0a6384cb4'
+  'category-book': '1ccd2b68726680b9938cf2c0a6384cb4',
+  'image-genai-guide': '1ccd2b68726680ba8cb7de202829d0ee'
 };
 
 /* Step 3: enter your page title and description for SEO purposes */
@@ -50,21 +48,27 @@ addEventListener('fetch', event => {
   event.respondWith(fetchAndApply(event.request));
 });
 
-// Slug normalize 工具，確保一致性（處理中文加 /）
 function normalizeSlug(slug) {
-  try {
-    const decoded = decodeURIComponent(slug);
-    if (/[\u4e00-\u9fa5]/.test(decoded) && !decoded.endsWith('/')) {
-      return decoded + '/';
-    }
-    return decoded;
-  } catch {
-    return slug;
-  }
+  return slug
+    .trim()
+    .replace(/^\/+/, '') // 移除前面的斜線
+    .replace(/\/+$/, '') // 移除後面的斜線
 }
 
+const redirects = {
+  '/關於我/': '/about',
+  '/聯絡我/': '/contact',
+  '/經理人之道-技術領袖航向成長與改變的參考指南/': '/managers-path',
+  '/【生成式ai驅動未來變革：開源工具與技術架構的雙/': '/genai-future',
+  '/category/career/review/': '/career-review',
+  '/category/career/review/feed/': '/career-review',
+  '/category/ai/': '/category-ai',
+  '/category/life-exploration/book/': '/category-book',
+  '/圖像生成式ai的生存指南-以stable-diffusion為例/': '/image-genai-guide'
+};
+
 // sitemap 生成功能：補上所有 slug
-async function generateSitemap() {
+function generateSitemap() {
   const baseUrl = 'https://' + MY_DOMAIN;
 
   const slugSet = new Set();
@@ -76,24 +80,29 @@ async function generateSitemap() {
 
   // 加入 redirect 中的 slug
   for (const [from, _] of Object.entries(redirects)) {
-    slugSet.add(normalizeSlug(from));
+    slugSet.add(normalizeSlug(from))
   }
 
   const urls = Array.from(slugSet).map((slug) => {
-    const loc = `${baseUrl}/${slug}`;
+    let normalized = normalizeSlug(slug)
 
-    return `<url>
-  <loc>${loc}</loc>
-  <lastmod>${new Date().toISOString()}</lastmod>
-</url>`;
-  });
+    // 根頁面
+    if (normalized === '') {
+      return `<url><loc>${baseUrl}</loc></url>`
+    }
+
+    // 中文 slug：結尾加 `/`
+    const isChinese = /[\u4e00-\u9fff]/.test(normalized)
+    const urlPath = isChinese ? `/${normalized}/` : `/${normalized}`
+
+    return `<url><loc>${baseUrl}${urlPath}</loc></url>`
+  })
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.join('\n')}
-</urlset>`;
+</urlset>`
 }
-
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -119,35 +128,16 @@ function handleOptions(request) {
   }
 }
 
-const redirects = {
-  '/關於我': '/about',
-  '/關於我/': '/about',
-  '/author/andy345694/': '/about',
-  '/經理人之道-技術領袖航向成長與改變的參考指南': '/managers-path',
-  '/經理人之道-技術領袖航向成長與改變的參考指南/': '/managers-path',
-  '/【生成式ai驅動未來變革：開源工具與技術架構的雙': '/genai-future',
-  '/【生成式ai驅動未來變革：開源工具與技術架構的雙/': '/genai-future',
-  '/category/career/review/': '/career-review',
-  '/category/ai/': '/category-ai',
-  '/category/life-exploration/book/': '/category-book'
-};
-
 async function fetchAndApply(request) {
   if (request.method === 'OPTIONS') {
     return handleOptions(request);
   }
   let url = new URL(request.url);
-  const decodedPath = decodeURIComponent(url.pathname);
-
-  let slug = url.pathname;
-
-  // 檢查是否存在於 redirects
-  const normalizedSlug = normalizeSlug(slug);
-  if (redirects[slug]) {
-    return Response.redirect(`https://${MY_DOMAIN}${redirects[slug]}`, 301);
-  }
-  if (redirects[normalizedSlug]) {
-    return Response.redirect(`https://${MY_DOMAIN}${redirects[normalizedSlug]}`, 301);
+  const decodedPath = decodeURIComponent(url.pathname);  // e.g. /聯絡我/
+  const fullDomain = `https://${MY_DOMAIN}`;
+  // --- Redirects 比對 ---
+  if (redirects[decodedPath]) {
+    return Response.redirect(`${fullDomain}${redirects[decodedPath]}`, 301);
   }
 
   url.hostname = 'www.notion.so';
@@ -156,7 +146,7 @@ async function fetchAndApply(request) {
     return new Response('Sitemap: https://' + MY_DOMAIN + '/sitemap.xml');
   }
   if (url.pathname === '/sitemap.xml') {
-    let response = new Response(await generateSitemap());
+    let response = new Response(generateSitemap());
     response.headers.set('content-type', 'application/xml');
     return response;
   }
@@ -189,10 +179,8 @@ async function fetchAndApply(request) {
     );
     response.headers.set("Content-Type", "application/x-javascript");
     return response;
-  } 
-  const decodedSlug = decodeURIComponent(url.pathname.slice(1));
-  if (SLUG_TO_PAGE.hasOwnProperty(decodedSlug)) {
-    const pageId = SLUG_TO_PAGE[decodedSlug];
+  } else if (slugs.indexOf(url.pathname.slice(1)) > -1) {
+    const pageId = SLUG_TO_PAGE[url.pathname.slice(1)];
     return Response.redirect('https://' + MY_DOMAIN + '/' + pageId, 301);
   } else {
     response = await fetch(url.toString(), {
@@ -210,7 +198,7 @@ async function fetchAndApply(request) {
 
 class MetaRewriter {
   element(element) {
-    if (PAGE_TITLE) {
+    if (PAGE_TITLE !== '') {
       if (element.getAttribute('property') === 'og:title'
         || element.getAttribute('name') === 'twitter:title') {
         element.setAttribute('content', PAGE_TITLE);
@@ -219,7 +207,7 @@ class MetaRewriter {
         element.setInnerContent(PAGE_TITLE);
       }
     }
-    if (PAGE_DESCRIPTION) {
+    if (PAGE_DESCRIPTION !== '') {
       if (element.getAttribute('name') === 'description'
         || element.getAttribute('property') === 'og:description'
         || element.getAttribute('name') === 'twitter:description') {
@@ -238,7 +226,7 @@ class MetaRewriter {
 
 class HeadRewriter {
   element(element) {
-    if (GOOGLE_FONT) {
+    if (GOOGLE_FONT !== '') {
       element.append(`<link href="https://fonts.googleapis.com/css?family=${GOOGLE_FONT.replace(' ', '+')}:Regular,Bold,Italic&display=swap" rel="stylesheet">
       <style>* { font-family: "${GOOGLE_FONT}" !important; }</style>`, {
         html: true
@@ -302,16 +290,9 @@ class BodyRewriter {
     function getSlug() {
       return location.pathname.slice(1);
     }
-    function isChineseSlug(slug) {
-      return /[\p{Script=Han}，。！？：「」、（）【】《》－]/u.test(slug);
-    }
-
     function updateSlug() {
-      let slug = PAGE_TO_SLUG[getPage()];
+      const slug = PAGE_TO_SLUG[getPage()];
       if (slug != null) {
-        if (isChineseSlug(slug) && !slug.endsWith('/')) {
-          slug += '/';
-        }
         history.replaceState(history.state, '', '/' + slug);
       }
     }
@@ -386,11 +367,7 @@ class BodyRewriter {
       const dest = new URL(location.protocol + location.host + arguments[2]);
       const id = dest.pathname.slice(-32);
       if (pages.includes(id)) {
-        let slug = PAGE_TO_SLUG[id];
-        if (isChineseSlug(slug) && !slug.endsWith('/')) {
-          slug += '/';
-        }
-        arguments[2] = '/' + slug;
+        arguments[2] = '/' + PAGE_TO_SLUG[id];
       }
       return pushState.apply(window.history, arguments);
     };
