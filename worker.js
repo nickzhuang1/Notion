@@ -19,7 +19,8 @@ const SLUG_TO_PAGE = {
   'career-review': '1ccd2b68726681b3aec9ff112d6234db',
   'category-ai': '1ccd2b68726681e5b15ceee94737bc00',
   'category-book': '1ccd2b68726680b9938cf2c0a6384cb4',
-  'image-genai-guide': '1ccd2b68726680ba8cb7de202829d0ee'
+  'image-genai-guide': '1ccd2b68726680ba8cb7de202829d0ee',
+  'my-career': '274d2b687266808da195e046d4c04ea1'
 };
 
 /* Step 3: enter your page title and description for SEO purposes */
@@ -94,18 +95,15 @@ async function generateSitemap() {
   }
 
   // 2. redirects 的 from slug 也納入 sitemap（代表舊網址還要 index）
-  for (const [from] of Object.entries(redirects)) {
-    slugSet.add(normalizeSlug(from));
-  }
-
-  const now = new Date().toISOString();
+  // for (const [from] of Object.entries(redirects)) {
+  //   slugSet.add(normalizeSlug(from));
+  // }
 
   const urls = Array.from(slugSet).map((slug) => {
     const normalizedPath = slug.startsWith('/') ? slug.slice(1) : slug;
     return `
   <url>
     <loc>${baseUrl}/${normalizedPath}</loc>
-    <lastmod>${now}</lastmod>
   </url>`;
   });
 
@@ -138,6 +136,11 @@ function handleOptions(request) {
     });
   }
 }
+
+// 統一使用的 UA
+const DEFAULT_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
+
 
 async function fetchAndApply(request) {
   if (request.method === 'OPTIONS') {
@@ -174,7 +177,7 @@ async function fetchAndApply(request) {
       body: url.pathname.startsWith('/api/v3/getPublicPageData') ? null : request.body,
       headers: {
         'content-type': 'application/json;charset=UTF-8',
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36'
+        'user-agent': DEFAULT_UA
       },
       method: 'POST',
     });
@@ -204,7 +207,7 @@ async function fetchAndApply(request) {
     response.headers.delete('X-Content-Security-Policy');
   }
 
-  return appendJavascript(response, SLUG_TO_PAGE);
+  return appendJavascript(response, SLUG_TO_PAGE, url);
 }
 
 class MetaRewriter {
@@ -236,13 +239,23 @@ class MetaRewriter {
 }
 
 class HeadRewriter {
+  constructor(canonicalUrl) {
+    this.canonicalUrl = canonicalUrl;
+  }
+
   element(element) {
+    // Canonical
+    element.append(`<link rel="canonical" href="${this.canonicalUrl}">`, {
+      html: true
+    });
+
     if (GOOGLE_FONT !== '') {
       element.append(`<link href="https://fonts.googleapis.com/css?family=${GOOGLE_FONT.replace(' ', '+')}:Regular,Bold,Italic&display=swap" rel="stylesheet">
       <style>* { font-family: "${GOOGLE_FONT}" !important; }</style>`, {
         html: true
       });
     }
+
     element.append(`<style>
     div.notion-topbar > div > div:nth-child(3) { display: none !important; }
     div.notion-topbar > div > div:nth-child(4) { display: none !important; }
@@ -393,11 +406,28 @@ class BodyRewriter {
   }
 }
 
-async function appendJavascript(res, SLUG_TO_PAGE) {
+async function appendJavascript(res, SLUG_TO_PAGE, url) {
+  // const url = new URL(res.url);
+  const slug = url.pathname.replace(/\/$/, "");
+  const canonicalUrl = `https://${MY_DOMAIN}${slug}`;
+
+  // Debug log
+  console.log("[Canonical]", canonicalUrl);
+
+  // 正確複製回應並加上 debug header
+  const newHeaders = new Headers(res.headers);
+  newHeaders.set("x-debug-canonical", canonicalUrl);
+
+  const responseWithHeader = new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: newHeaders,
+  });
+
   return new HTMLRewriter()
     .on('title', new MetaRewriter())
     .on('meta', new MetaRewriter())
-    .on('head', new HeadRewriter())
+    .on('head', new HeadRewriter(canonicalUrl))
     .on('body', new BodyRewriter(SLUG_TO_PAGE))
-    .transform(res);
+    .transform(responseWithHeader);
 }
