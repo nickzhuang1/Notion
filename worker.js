@@ -20,7 +20,8 @@ const SLUG_TO_PAGE = {
   'category-ai': '1ccd2b68726681e5b15ceee94737bc00',
   'category-book': '1ccd2b68726680b9938cf2c0a6384cb4',
   'image-genai-guide': '1ccd2b68726680ba8cb7de202829d0ee',
-  'my-career': '274d2b687266808da195e046d4c04ea1'
+  'my-career': '274d2b687266808da195e046d4c04ea1',
+  'intro-dl-dli': '280d2b68726680c1931de96b4fbb6440'
 };
 
 /* Step 3: enter your page title and description for SEO purposes */
@@ -147,6 +148,28 @@ async function fetchAndApply(request) {
     return handleOptions(request);
   }
   let url = new URL(request.url);
+
+  const ua = request.headers.get('user-agent') || '';
+  // Googlebot fallback
+  if (/googlebot/i.test(ua)) {
+    return new Response(`<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>關於我 - Nick Zhuang</title>
+  <meta name="description" content="Nick Zhuang 的個人介紹與背景資訊。">
+  <meta name="robots" content="index,follow" />
+</head>
+<body>
+  <h1>關於我</h1>
+  <p>這是 Nick Zhuang 的個人頁面，分享職涯、AI 技術與雲端平台經驗。</p>
+  <p>更多內容請瀏覽 <a href="https://nickzhuang.com">nickzhuang.com</a></p>
+</body>
+</html>`, {
+      headers: { 'content-type': 'text/html; charset=UTF-8', 'x-debug-worker': 'googlebot-fallback' }
+    });
+  }
+
   const decodedPath = decodeURIComponent(url.pathname);  // e.g. /聯絡我/
   const fullDomain = `https://${MY_DOMAIN}`;
   // --- Redirects 比對 ---
